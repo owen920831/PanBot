@@ -9,6 +9,12 @@ from gradio_client import Client
 import tempfile
 import google.generativeai as genai
 import PIL.Image
+import re
+import nltk
+from nltk.tokenize import sent_tokenize
+
+# 下载需要的 NLTK 数据
+nltk.download('punkt')
 # 定义状态
 
 class TelegramBot:
@@ -236,14 +242,26 @@ class TelegramBot:
             """)
 
     def respond(self, update, context):
-        # user_id = update.message.from_user.id
         user_input = update.message.text
-        
+        response_buffer = ""  # Holds accumulated response chunks
 
-        # if user_id == self.user_id:
-        response = self.text_client.send_message(user_input, stream=True)
-        for chunk in response:
-            update.message.reply_text(chunk.text)
+        for chunk in self.text_client.send_message(user_input, stream=True):
+            response_buffer += chunk.text
+
+            # Split buffer on sentence boundaries (implement sentence detection logic)
+            sentences = self.split_into_sentences(response_buffer)
+            for sentence in sentences:
+                update.message.reply_text(sentence)
+
+            # Clear buffer after sending sentences
+            response_buffer = response_buffer[len(sentence):]  # Keep any remaining text
+
+
+    def split_into_sentences(self, text):
+        # 使用 NLTK 的 sent_tokenize 函数进行句子分割
+        sentences = sent_tokenize(text)
+        return sentences
+
 
     def handle_image(self, update, context):
         photo = update.message.photo[-1]
@@ -265,8 +283,17 @@ class TelegramBot:
 
     def respond_image(self, update, caption, photo_file):
         response = self.img_model.generate_content([caption, photo_file], stream=True)
+        response_buffer = ""  # Holds accumulated response chunks
         for chunk in response:
-            update.message.reply_text(chunk.text)
+            response_buffer += chunk.text
+
+            # Split buffer on sentence boundaries (implement sentence detection logic)
+            sentences = self.split_into_sentences(response_buffer)
+            for sentence in sentences:
+                update.message.reply_text(sentence)
+
+            # Clear buffer after sending sentences
+            response_buffer = response_buffer[len(sentence):]  # Keep any remaining text
     
     def setup_webhook(self):
         self.updater.bot.setWebhook(url="https://trianglesnake.nckuctf.org/owen/{}".format(self.token))
